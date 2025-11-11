@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import type { DatabaseClient } from './index';
 
 export class PrismaDatabaseClient implements DatabaseClient {
-  private prisma: PrismaClient;
+  public readonly prisma: PrismaClient;
 
   constructor() {
     this.prisma = new PrismaClient();

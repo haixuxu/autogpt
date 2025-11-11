@@ -38,3 +38,7 @@ export interface ExecutorFactory {
   createDockerExecutor(policy: SandboxPolicy): Promise<CodeExecutor>;
   createLocalSandbox(policy: SandboxPolicy): Promise<CodeExecutor>;
 }
+
+export { LocalSandboxExecutor } from './local-executor';
+export { DefaultExecutorFactory, DEFAULT_SANDBOX_POLICY } from './factory';
+export * from './sandbox-utils';

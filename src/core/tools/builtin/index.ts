@@ -5,9 +5,11 @@ import {
   ListDirectoryTool,
 } from './filesystem';
 import { WebSearchTool, WebScrapeTool } from './web-search';
+import { ExecuteCodeTool } from './code-execution';
 
 export * from './filesystem';
 export * from './web-search';
+export * from './code-execution';
 
 export function registerBuiltinTools(registry: ToolRegistry): void {
   // Filesystem tools
@@ -18,5 +20,8 @@ export function registerBuiltinTools(registry: ToolRegistry): void {
   // Web tools
   registry.register(new WebSearchTool());
   registry.register(new WebScrapeTool());
+
+  // Code execution
+  registry.register(new ExecuteCodeTool());
 }
 

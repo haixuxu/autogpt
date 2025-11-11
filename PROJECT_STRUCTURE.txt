@@ -1,0 +1,130 @@
+AutoGPT Project Structure
+=========================
+
+Root Files:
+- README.md                     # Project overview
+- QUICKSTART.md                 # 5-minute setup guide
+- CHANGELOG.md                  # Version history
+- PROJECT_STATS.md              # Detailed statistics
+- IMPLEMENTATION_STATUS.md      # Feature tracking
+- IMPLEMENTATION_COMPLETE.md    # Final summary
+- package.json                  # Dependencies
+- tsconfig.json                 # TypeScript config
+- tsup.config.ts                # Build config
+- .env.example                  # Environment template
+
+Source Code (src/):
+├── core/
+│   ├── agent/                  # Agent logic
+│   │   ├── actions.ts          # Action types
+│   │   ├── agent-loop.ts       # Main loop
+│   │   ├── memory-manager.ts   # Memory system
+│   │   ├── thought-process.ts  # LLM interaction
+│   │   ├── thought.ts          # Thought types
+│   │   └── prompts.ts          # Prompt templates
+│   ├── cli/                    # CLI interface
+│   │   ├── commands/
+│   │   │   ├── run.ts          # Run command
+│   │   │   ├── list.ts         # List command
+│   │   │   └── show.ts         # Show command
+│   │   ├── program.ts          # CLI program
+│   │   ├── ui.ts               # UI utilities
+│   │   ├── prompts.ts          # Interactive prompts
+│   │   └── index.ts
+│   ├── config/                 # Configuration
+│   │   ├── schema.ts           # Config schema
+│   │   ├── sources.ts          # Config sources
+│   │   ├── loader.ts           # Config loader
+│   │   └── index.ts
+│   ├── plugins/                # Plugin system
+│   │   ├── manifest-validator.ts
+│   │   ├── loader.ts           # Plugin loader
+│   │   ├── context.ts          # Plugin context
+│   │   ├── permissions.ts      # Permission manager
+│   │   └── index.ts
+│   ├── tools/                  # Tool system
+│   │   ├── builtin/
+│   │   │   ├── filesystem.ts   # File tools
+│   │   │   ├── web-search.ts   # Web tools
+│   │   │   ├── code-execution.ts
+│   │   │   └── index.ts
+│   │   ├── registry.ts         # Tool registry
+│   │   ├── action-executor.ts  # Executor
+│   │   └── index.ts
+│   ├── telemetry/              # Logging
+│   │   ├── logger.ts           # Winston logger
+│   │   └── index.ts
+│   ├── server/                 # Server types
+│   │   └── index.ts
+│   └── index.ts
+├── infra/                      # Infrastructure
+│   ├── database/
+│   │   ├── client.ts           # Prisma client
+│   │   └── index.ts
+│   ├── executor/
+│   │   ├── local-executor.ts   # Sandbox executor
+│   │   ├── factory.ts          # Executor factory
+│   │   ├── sandbox-utils.ts    # Utilities
+│   │   └── index.ts
+│   ├── llm/
+│   │   ├── types.ts            # LLM types
+│   │   ├── provider.ts         # OpenAI provider
+│   │   └── index.ts
+│   ├── vectorstore/
+│   │   ├── chroma-store.ts     # Chroma integration
+│   │   └── index.ts
+│   └── index.ts
+├── shared/                     # Shared utilities
+│   ├── types/
+│   │   └── index.ts
+│   ├── utils/
+│   │   └── index.ts
+│   ├── errors.ts               # Error types
+│   ├── retry.ts                # Retry logic
+│   └── index.ts
+├── cli.ts                      # CLI entry point
+└── index.ts                    # Main entry
+
+Database (prisma/):
+├── schema.prisma               # Database schema
+└── migrations/                 # Database migrations
+    └── 20250115_init/
+        └── migration.sql
+
+Documentation (docs/):
+├── architecture/               # Architecture docs
+│   ├── roadmap.md
+│   └── ...
+├── USER_GUIDE.md               # User manual
+└── CONTRIBUTING.md             # Developer guide
+
+Examples (examples/):
+├── simple-task/
+│   └── README.md
+├── web-research/
+│   └── README.md
+└── code-analysis/
+    └── README.md
+
+Build Output (dist/):
+├── cli.js                      # CLI executable (ESM)
+├── cli.cjs                     # CLI executable (CJS)
+├── index.js                    # Main module (ESM)
+├── index.cjs                   # Main module (CJS)
+├── *.d.ts                      # Type declarations
+└── *.map                       # Source maps
+
+Configuration:
+├── .env.example                # Environment template
+├── tsconfig.json               # TypeScript config
+├── tsup.config.ts              # Build config
+├── .eslintrc.json              # Linting config
+└── .prettierrc                 # Formatting config
+
+Total Statistics:
+- TypeScript files: 55
+- Documentation: 10+ files
+- Examples: 3
+- Database models: 8
+- Built-in tools: 6
+- Build size: 584KB

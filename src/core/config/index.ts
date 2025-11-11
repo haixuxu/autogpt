@@ -61,3 +61,6 @@ export type ConfigOverride = Partial<AppConfig> & {
 export { DefaultConfigLoader } from './loader';
 export { EnvConfigSource, JsonConfigSource, mergeConfigs } from './sources';
 export { ConfigValidator } from './schema';
+
+// Rename PluginConfig to avoid conflict with plugins/index.ts
+export type { PluginConfig as ConfigPluginConfig } from './index';

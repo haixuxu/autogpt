@@ -43,6 +43,12 @@ export interface PluginModule extends PluginLifecycle {
   readonly register: (context: PluginContext) => Promise<void> | void;
 }
 
+export interface PluginConfig {
+  enabled: boolean;
+  directories: string[];
+  autoApprove?: boolean;
+}
+
 export interface PluginLoader {
   discover(): Promise<PluginManifest[]>;
   load(manifest: PluginManifest): Promise<PluginModule>;
@@ -50,3 +56,8 @@ export interface PluginLoader {
 }
 
 export type PluginModuleFactory = () => Promise<PluginModule> | PluginModule;
+
+export { DefaultPluginLoader } from './loader';
+export { ManifestValidator } from './manifest-validator';
+export { DefaultPluginContext } from './context';
+export { PluginPermissionManager, type Permission, type PermissionRequest } from './permissions';
