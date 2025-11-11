@@ -34,6 +34,9 @@ export interface AgentLoopOptions {
   readonly maxCycles?: number;
   readonly continuous?: boolean;
   readonly hooks?: AgentLifecycleHooks;
+  readonly feedbackProvider?: (
+    context: AgentCycleContext
+  ) => Promise<string | undefined | null>;
 }
 
 export interface AgentLoop {

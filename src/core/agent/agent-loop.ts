@@ -23,10 +23,20 @@ export class DefaultAgentLoop implements AgentLoop {
 
     try {
       while (this.running && this.currentCycle < maxCycles) {
-        const cycleContext: AgentCycleContext = {
+        let cycleContext: AgentCycleContext = {
           ...context,
           cycle: this.currentCycle,
         };
+
+        if (this.options.feedbackProvider) {
+          const feedback = await this.options.feedbackProvider(cycleContext);
+          if (feedback) {
+            cycleContext = {
+              ...cycleContext,
+              userFeedback: feedback,
+            };
+          }
+        }
 
         const shouldContinue = await this.runCycle(cycleContext);
 

@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 
 type AgentProfile = {
   description?: string;
@@ -82,6 +83,14 @@ type AgentWorkspace = {
   }>;
 };
 
+type ConversationMessage = {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  type: string;
+  content: Record<string, unknown>;
+  createdAt: string;
+};
+
 interface AgentDetails {
   id: string;
   name: string;
@@ -97,17 +106,33 @@ interface AgentDetails {
   workspaces: AgentWorkspace[];
 }
 
-type TabKey = 'overview' | 'cycles' | 'memories' | 'workspace';
+type TabKey =
+  | 'overview'
+  | 'cycles'
+  | 'memories'
+  | 'workspace'
+  | 'conversation';
 
 export default function AgentDetailPage() {
   const params = useParams();
   const agentId = params.id as string;
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
+  const WS_BASE_URL =
+    process.env.NEXT_PUBLIC_API_WS_URL ?? 'ws://localhost:3001/ws';
 
   const [agent, setAgent] = useState<AgentDetails | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [messageInput, setMessageInput] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [agentRunning, setAgentRunning] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const fetchAgent = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -133,6 +158,7 @@ export default function AgentDetailPage() {
 
         const data = await response.json();
         setAgent(data.agent);
+        setAgentRunning(data.agent?.status === 'RUNNING');
       } catch (err: any) {
         setError(err.message || 'Unable to load agent');
       } finally {
@@ -147,9 +173,181 @@ export default function AgentDetailPage() {
     fetchAgent();
   }, [fetchAgent]);
 
+  const appendMessage = useCallback((message: ConversationMessage) => {
+    setMessages((prev) => {
+      if (prev.some((existing) => existing.id === message.id)) {
+        return prev;
+      }
+      return [...prev, message];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!agentId) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadMessages = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/agents/${agentId}/messages`
+        );
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        if (cancelled) {
+          return;
+        }
+        const items = (data.messages || []).map((message: any) => ({
+          id: message.id as string,
+          role: message.role as 'user' | 'assistant' | 'system',
+          type: message.type as string,
+          content: (message.content as Record<string, unknown>) ?? {},
+          createdAt: message.createdAt as string,
+        }));
+        setMessages(items);
+      } catch (error) {
+        console.error('Failed to load agent messages', error);
+      }
+    };
+
+    loadMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId, API_BASE_URL]);
+
+  useEffect(() => {
+    if (!agentId) {
+      return;
+    }
+
+    const socket = new WebSocket(WS_BASE_URL);
+    wsRef.current = socket;
+
+    socket.onopen = () => {
+      setWsConnected(true);
+      socket.send(
+        JSON.stringify({
+          type: 'subscribe',
+          agentId,
+        })
+      );
+    };
+
+    socket.onclose = () => {
+      setWsConnected(false);
+      if (wsRef.current === socket) {
+        wsRef.current = null;
+      }
+    };
+
+    socket.onerror = () => {
+      setWsConnected(false);
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'agent_event' && data.agentId === agentId) {
+          const evt = data.event ?? {};
+          const incoming: ConversationMessage = {
+            id: (evt.id as string) ?? `event-${Date.now()}`,
+            role: (evt.role as 'user' | 'assistant' | 'system') ?? 'system',
+            type: (evt.messageType as string) ?? 'system',
+            content:
+              (evt.content as Record<string, unknown>) ??
+              (evt.text ? { text: evt.text } : {}),
+            createdAt:
+              typeof evt.createdAt === 'string'
+                ? evt.createdAt
+                : new Date().toISOString(),
+          };
+          appendMessage(incoming);
+        } else if (data.type === 'agent_status' && data.agentId === agentId) {
+          setAgentRunning(Boolean(data.event?.running));
+        }
+      } catch (error) {
+        console.error('Failed to parse websocket message', error);
+      }
+    };
+
+    return () => {
+      socket.close();
+      setWsConnected(false);
+      if (wsRef.current === socket) {
+        wsRef.current = null;
+      }
+    };
+  }, [agentId, WS_BASE_URL, appendMessage]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchAgent({ silent: true });
+  };
+
+  const handleRunAgent = async () => {
+    if (!agentId) {
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/agents/${agentId}/run`,
+        {
+          method: 'POST',
+        }
+      );
+      if (response.status === 202 || response.status === 409) {
+        setAgentRunning(true);
+      } else if (!response.ok) {
+        console.error('Failed to start agent run');
+      }
+    } catch (error) {
+      console.error('Failed to start agent run', error);
+    }
+  };
+
+  const handleSendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = messageInput.trim();
+    if (!text || !agentId) {
+      return;
+    }
+
+    setSendingMessage(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/agents/${agentId}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: 'feedback',
+            content: { text },
+          }),
+        }
+      );
+      if (!response.ok) {
+        console.error('Failed to send message');
+      } else {
+        setMessageInput('');
+      }
+    } catch (error) {
+      console.error('Failed to send message', error);
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -228,6 +426,82 @@ export default function AgentDetailPage() {
     return `${size.toFixed(1)} ${units[index]}`;
   };
 
+  const renderConversationContent = (message: ConversationMessage) => {
+    const content = message.content ?? {};
+    const text =
+      typeof content['text'] === 'string'
+        ? (content['text'] as string)
+        : undefined;
+
+    if (message.type === 'thought') {
+      const reasoning = Array.isArray(content['reasoning'])
+        ? (content['reasoning'] as string[])
+        : [];
+      const plan = Array.isArray(content['plan'])
+        ? (content['plan'] as string[])
+        : [];
+      return (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">
+            Proposed action: {String(content['command'] ?? 'unknown')}
+          </p>
+          {reasoning.length > 0 && (
+            <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+              {reasoning.map((item, idx) => (
+                <li key={idx}>{item}</li>
+              ))}
+            </ul>
+          )}
+          {plan.length > 0 && (
+            <div className="rounded-md bg-background/60 p-2 text-xs text-muted-foreground">
+              <p className="font-semibold">Plan</p>
+              <ul className="mt-1 list-decimal space-y-1 pl-4">
+                {plan.map((step, idx) => (
+                  <li key={idx}>{step}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {renderJson(content['arguments'], 'No command arguments')}
+        </div>
+      );
+    }
+
+    if (message.type === 'result') {
+      const success = Boolean(content['success']);
+      return (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">
+            {success ? '✅ Success' : '⚠️ Failed'} —{' '}
+            {String(content['summary'] ?? '')}
+          </p>
+          {content['output'] && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Output
+              </p>
+              {renderJson(
+                content['output'],
+                'Action produced no structured output'
+              )}
+            </div>
+          )}
+          {content['error'] && (
+            <div className="rounded-md bg-red-50 p-2 text-xs text-red-700">
+              {String(content['error'])}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <p className="text-sm">
+        {text ?? JSON.stringify(content, null, 2)}
+      </p>
+    );
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -273,10 +547,26 @@ export default function AgentDetailPage() {
               Back to Agents
             </Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={handleRunAgent}
+              disabled={agentRunning}
+            >
+              {agentRunning ? 'Running...' : 'Start Agent'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+              />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -303,6 +593,7 @@ export default function AgentDetailPage() {
           { id: 'cycles', label: `Cycles (${cycles.length})` },
           { id: 'memories', label: `Memories (${memories.length})` },
           { id: 'workspace', label: `Workspace (${workspaces.length})` },
+          { id: 'conversation', label: `Conversation (${messages.length})` },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -641,6 +932,83 @@ export default function AgentDetailPage() {
                 </div>
               ))
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'conversation' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Conversation</CardTitle>
+            <CardDescription>
+              Interact with the agent in real time. Provide additional context or
+              feedback to guide the next cycle.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex h-[500px] flex-col">
+            <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+              {messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No messages yet. Start the agent and send guidance to begin the
+                  conversation.
+                </p>
+              ) : (
+                messages.map((message) => {
+                  const isUser = message.role === 'user';
+                  const bubbleClass = isUser
+                    ? 'bg-primary text-primary-foreground'
+                    : message.role === 'assistant'
+                      ? 'bg-secondary text-secondary-foreground'
+                      : 'bg-muted text-muted-foreground';
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                    >
+                      <div
+                        className={`max-w-full rounded-lg px-3 py-2 text-left text-sm shadow-sm ${bubbleClass}`}
+                      >
+                        <p className="text-xs uppercase tracking-wide opacity-70">
+                          {message.role} · {message.type}
+                        </p>
+                        <div className="mt-1 space-y-2">
+                          {renderConversationContent(message)}
+                        </div>
+                      </div>
+                      <span className="mt-1 text-[10px] text-muted-foreground">
+                        {formatDateTime(message.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <form onSubmit={handleSendMessage} className="mt-4 space-y-2">
+              <Textarea
+                value={messageInput}
+                onChange={(event) => setMessageInput(event.target.value)}
+                placeholder="Type your feedback or guidance..."
+                rows={3}
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {wsConnected ? 'Live updates connected' : 'Realtime updates offline'}
+                  {agentRunning ? ' • Agent running' : ''}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={sendingMessage || !messageInput.trim()}
+                  >
+                    <Send className="mr-2 h-3 w-3" />
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </form>
           </CardContent>
         </Card>
       )}

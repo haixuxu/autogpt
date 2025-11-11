@@ -20,6 +20,7 @@ model Agent {
   workspaces   Workspace[]
   cycles       AgentCycle[]
   memories     MemoryRecord[]
+  messages     AgentMessage[]
 }
 
 model Workspace {
@@ -92,4 +93,20 @@ model MemoryRecord {
   content     String
   metadata    String?  // JSON string
   createdAt   DateTime @default(now())
+}
+
+model AgentMessage {
+  id        String   @id @default(cuid())
+  agent     Agent    @relation(fields: [agentId], references: [id])
+  agentId   String
+  role      String   // user | assistant | system
+  type      String   // thought | action | result | feedback | feedback_request | system
+  content   String   // JSON string
+  createdAt DateTime @default(now())
+  handled   Boolean  @default(false)
+  handledAt DateTime?
+  handledBy String?
+
+  @@index([agentId, createdAt])
+  @@index([agentId, handled, createdAt])
 }

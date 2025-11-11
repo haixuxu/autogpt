@@ -2,8 +2,12 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
+import type WebSocket from 'ws';
 import { agentRoutes } from './routes/agents.js';
 import { taskRoutes } from './routes/tasks.js';
+import { agentMessageRoutes } from './routes/agent-messages.js';
+import { agentRunRoutes } from './routes/agent-run.js';
+import { subscribeAgent, unsubscribeSocket } from './services/ws-hub.js';
 
 const fastify = Fastify({
   logger: true,
@@ -25,26 +29,49 @@ fastify.get('/health', async () => {
 
 // Routes
 fastify.register(agentRoutes, { prefix: '/api/agents' });
+fastify.register(agentMessageRoutes, { prefix: '/api/agents' });
+fastify.register(agentRunRoutes, { prefix: '/api/agents' });
 fastify.register(taskRoutes, { prefix: '/api/tasks' });
 
 // WebSocket endpoint
 fastify.register(async (instance) => {
-  instance.get('/ws', { websocket: true }, (connection, req) => {
-    connection.socket.on('message', (message) => {
-      const data = JSON.parse(message.toString());
-      
-      if (data.type === 'subscribe') {
-        connection.socket.send(JSON.stringify({
-          type: 'subscribed',
-          taskId: data.taskId,
-        }));
+  instance.get('/ws', { websocket: true }, (connection) => {
+    const { socket } = connection;
+    const ws = socket as unknown as WebSocket;
+
+    ws.on('message', (raw) => {
+      try {
+        const data = JSON.parse(raw.toString());
+        if (data?.type === 'subscribe' && data.agentId) {
+          subscribeAgent(ws, data.agentId);
+          ws.send(
+            JSON.stringify({
+              type: 'subscribed',
+              agentId: data.agentId,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        }
+      } catch (error) {
+        ws.send(
+          JSON.stringify({
+            type: 'error',
+            message: 'Invalid message payload',
+          })
+        );
       }
     });
 
-    connection.socket.send(JSON.stringify({
-      type: 'connected',
-      timestamp: new Date().toISOString(),
-    }));
+    ws.on('close', () => {
+      unsubscribeSocket(ws);
+    });
+
+    ws.send(
+      JSON.stringify({
+        type: 'connected',
+        timestamp: new Date().toISOString(),
+      })
+    );
   });
 });
 
