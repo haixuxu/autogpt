@@ -42,6 +42,12 @@ export async function runCommand(
     const toolRegistry = new DefaultToolRegistry();
     registerBuiltinTools(toolRegistry);
 
+    if (!config.llm.apiKey) {
+      throw new Error(
+        'Missing OpenAI API key. Please set OPENAI_API_KEY in your environment or configuration.'
+      );
+    }
+
     const provider = new OpenAIProvider(config.llm);
     const memory = new StubMemoryManager();
     const thoughtProcess = new DefaultThoughtProcess(

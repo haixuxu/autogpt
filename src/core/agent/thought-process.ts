@@ -1,4 +1,9 @@
 import type { LlmProvider } from '../../infra/llm/index';
+import type {
+  ChatMessage,
+  ChatOptions,
+  ChatFunction,
+} from '../../infra/llm/types';
 import type { LlmConfig } from '../config/index';
 import type { Tool } from '../tools/index';
 import type {
@@ -76,6 +81,77 @@ export class DefaultThoughtProcess implements ThoughtProcess {
 
     // Fallback: try to parse from raw text
     return this.parseFallback(response.raw, now);
+  }
+
+  async callModel(prompt: PromptPayload): Promise<ThoughtResponsePayload> {
+    const messages: ChatMessage[] = prompt.messages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+
+    const options: ChatOptions = {
+      temperature: prompt.temperature,
+      maxTokens: this.config.maxTokens,
+    };
+
+    if (prompt.functions && prompt.functions.length > 0) {
+      const functions: ChatFunction[] = prompt.functions.map((fn) => ({
+        name: fn.name,
+        description: fn.description,
+        parameters: fn.parameters,
+      }));
+      options.functions = functions;
+      options.functionCall = 'auto';
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+
+    let response;
+    try {
+      response = await this.provider.chat(messages, {
+        ...options,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to generate thought from LLM: ${message}`, {
+        cause: error,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const parts: string[] = [];
+    if (response.content?.trim()) {
+      parts.push(response.content.trim());
+    }
+    if (response.functionCall) {
+      parts.push(
+        `function_call: ${response.functionCall.name}(${response.functionCall.arguments})`
+      );
+    }
+
+    if (response.functionCall) {
+      return {
+        raw: parts.join('\n') || response.content || '',
+        parsed: {
+          name: response.functionCall.name,
+          arguments: response.functionCall.arguments,
+          reasoning: response.content
+            ? response.content
+                .split('\n')
+                .map((line) => line.trim())
+                .filter(Boolean)
+            : undefined,
+        },
+      };
+    }
+
+    return {
+      raw: parts.join('\n') || response.content || '',
+    };
   }
 
   private parseFallback(raw: string, timestamp: number): ActionProposal {

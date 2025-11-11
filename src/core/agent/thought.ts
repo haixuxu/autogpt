@@ -17,6 +17,7 @@ export interface DirectiveBundle {
 
 export interface ThoughtProcess {
   preparePrompt(inputs: ThoughtInputs): Promise<PromptPayload>;
+  callModel(prompt: PromptPayload): Promise<ThoughtResponsePayload>;
   parseResponse(response: ThoughtResponsePayload): Promise<ActionProposal>;
 }
 

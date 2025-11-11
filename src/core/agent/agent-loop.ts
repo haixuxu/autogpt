@@ -5,8 +5,7 @@ import type {
   AgentLoopOptions,
 } from './loop';
 import type { ActionProposal, ActionResult } from './actions';
-import type { ThoughtInputs } from './thought';
-import type { LlmProvider } from '../../infra/llm/index';
+import type { ThoughtInputs, ThoughtResponsePayload } from './thought';
 import { DEFAULT_DIRECTIVES } from './prompts';
 
 export class DefaultAgentLoop implements AgentLoop {
@@ -60,6 +59,7 @@ export class DefaultAgentLoop implements AgentLoop {
 
     try {
       // Step 1: Think - generate action proposal
+      console.log('🤔 Generating next action using the language model...');
       const proposal = await this.think(context);
 
       // Hook: Action proposed
@@ -119,15 +119,26 @@ export class DefaultAgentLoop implements AgentLoop {
     // Generate prompt
     const prompt = await context.thoughtProcess.preparePrompt(inputs);
 
-    // Call LLM (assuming we have access to provider through thoughtProcess)
-    // For now, this is simplified; in full implementation, thoughtProcess should handle this
-    const response = {
-      raw: 'Placeholder response - LLM integration pending',
-      parsed: {
-        name: 'task_complete',
-        arguments: { summary: 'Agent loop executed successfully' },
-      },
-    };
+    // Call LLM via thought process
+    let response: ThoughtResponsePayload;
+    try {
+      response = await context.thoughtProcess.callModel(prompt);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown LLM error';
+      response = {
+        raw: `LLM error: ${message}`,
+        parsed: {
+          name: 'task_complete',
+          arguments: {
+            summary: `Unable to continue because the language model request failed: ${message}`,
+          },
+          reasoning: [
+            'Stopping execution because the model did not return a response.',
+          ],
+        },
+      };
+    }
 
     // Parse response into action proposal
     const proposal = await context.thoughtProcess.parseResponse(response);

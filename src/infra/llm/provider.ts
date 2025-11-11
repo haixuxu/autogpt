@@ -24,6 +24,7 @@ export class OpenAIProvider implements LlmProvider {
   constructor(config: LlmConfig) {
     this.config = config;
     this.client = new OpenAI({
+      baseURL: 'https://chat.cdts.site/v1',
       apiKey: config.apiKey,
     });
   }
@@ -32,23 +33,26 @@ export class OpenAIProvider implements LlmProvider {
     messages: ChatMessage[],
     options?: ChatOptions
   ): Promise<ChatResponse> {
-    const response = await this.client.chat.completions.create({
-      model: options?.maxTokens ? this.config.model : this.config.model,
-      messages: messages.map((m) => {
-        const message: any = {
-          role: m.role,
-          content: m.content,
-        };
-        if (m.name) {
-          message.name = m.name;
-        }
-        return message;
-      }),
-      temperature: options?.temperature ?? this.config.temperature,
-      max_tokens: options?.maxTokens ?? this.config.maxTokens,
-      functions: options?.functions,
-      function_call: options?.functionCall,
-    });
+    const response = await this.client.chat.completions.create(
+      {
+        model: options?.maxTokens ? this.config.model : this.config.model,
+        messages: messages.map((m) => {
+          const message: any = {
+            role: m.role,
+            content: m.content,
+          };
+          if (m.name) {
+            message.name = m.name;
+          }
+          return message;
+        }),
+        temperature: options?.temperature ?? this.config.temperature,
+        max_tokens: options?.maxTokens ?? this.config.maxTokens,
+        functions: options?.functions,
+        function_call: options?.functionCall,
+      },
+      options?.signal ? { signal: options.signal } : undefined
+    );
 
     const choice = response.choices[0];
     const message = choice.message;
@@ -77,24 +81,27 @@ export class OpenAIProvider implements LlmProvider {
     messages: ChatMessage[],
     options?: ChatOptions
   ): AsyncIterator<ChatStreamChunk> {
-    const stream = await this.client.chat.completions.create({
-      model: this.config.model,
-      messages: messages.map((m) => {
-        const message: any = {
-          role: m.role,
-          content: m.content,
-        };
-        if (m.name) {
-          message.name = m.name;
-        }
-        return message;
-      }),
-      temperature: options?.temperature ?? this.config.temperature,
-      max_tokens: options?.maxTokens ?? this.config.maxTokens,
-      functions: options?.functions,
-      function_call: options?.functionCall,
-      stream: true,
-    });
+    const stream = await this.client.chat.completions.create(
+      {
+        model: this.config.model,
+        messages: messages.map((m) => {
+          const message: any = {
+            role: m.role,
+            content: m.content,
+          };
+          if (m.name) {
+            message.name = m.name;
+          }
+          return message;
+        }),
+        temperature: options?.temperature ?? this.config.temperature,
+        max_tokens: options?.maxTokens ?? this.config.maxTokens,
+        functions: options?.functions,
+        function_call: options?.functionCall,
+        stream: true,
+      },
+      options?.signal ? { signal: options.signal } : undefined
+    );
 
     for await (const chunk of stream) {
       const choice = chunk.choices[0];

@@ -20,6 +20,7 @@ export interface ChatOptions {
   functions?: ChatFunction[];
   functionCall?: 'auto' | 'none' | { name: string };
   stream?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface ChatResponse {
