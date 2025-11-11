@@ -11,21 +11,15 @@ model Agent {
   id           String   @id @default(cuid())
   name         String
   task         String
-  status       AgentStatus  @default(ACTIVE)
-  profile      Json
-  directives   Json
-  config       Json
+  status       String   @default("ACTIVE")
+  profile      String   // JSON string
+  directives   String   // JSON string
+  config       String   // JSON string
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   workspaces   Workspace[]
   cycles       AgentCycle[]
   memories     MemoryRecord[]
-}
-
-enum AgentStatus {
-  ACTIVE
-  PAUSED
-  TERMINATED
 }
 
 model Workspace {
@@ -43,18 +37,12 @@ model WorkspaceFile {
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
   workspaceId String
   path        String
-  kind        FileKind
+  kind        String
   hash        String
   sizeBytes   Int
-  metadata    Json?
+  metadata    String?  // JSON string
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
-
-enum FileKind {
-  DOCUMENT
-  ARTIFACT
-  SNAPSHOT
 }
 
 model AgentCycle {
@@ -75,22 +63,22 @@ model AgentCycle {
 model ActionProposal {
   id          String      @id @default(cuid())
   cycle       AgentCycle  @relation(fields: [cycleId], references: [id])
-  cycleId     String
+  cycleId     String      @unique
   command     String
-  arguments   Json
-  reasoning   Json
-  plan        Json?
+  arguments   String      // JSON string
+  reasoning   String      // JSON string
+  plan        String?     // JSON string
   createdAt   DateTime @default(now())
 }
 
 model ActionResult {
   id          String      @id @default(cuid())
   cycle       AgentCycle  @relation(fields: [cycleId], references: [id])
-  cycleId     String
+  cycleId     String      @unique
   success     Boolean
-  output      Json
+  output      String      // JSON string
   summary     String
-  error       Json?
+  error       String?     // JSON string
   createdAt   DateTime @default(now())
 }
 
@@ -100,27 +88,8 @@ model MemoryRecord {
   agentId     String
   cycle       AgentCycle? @relation(fields: [cycleId], references: [id])
   cycleId     String?
-  type        MemoryType
+  type        String
   content     String
-  metadata    Json?
-  embedding   Float[]
+  metadata    String?  // JSON string
   createdAt   DateTime @default(now())
-}
-
-enum MemoryType {
-  OBSERVATION
-  REFLECTION
-  PLAN
-  RESULT
-}
-
-model MemoryIndex {
-  id          String   @id @default(cuid())
-  memory      MemoryRecord @relation(fields: [memoryId], references: [id])
-  memoryId    String
-  namespace   String
-  score       Float
-  createdAt   DateTime @default(now())
-
-  @@index([namespace])
 }

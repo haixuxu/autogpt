@@ -1,15 +1,5 @@
-import type { Command } from 'commander';
-
-export interface CliBootstrapOptions {
-  readonly configLoader: unknown;
-}
-
-export interface CliFactory {
-  create(options: CliBootstrapOptions): Command;
-}
-
-export const createPlaceholderCli: CliFactory = {
-  create() {
-    throw new Error('CLI not yet implemented');
-  },
-};
+export * from './program';
+export * from './ui';
+export * from './commands/run';
+export * from './commands/list';
+export * from './commands/show';

@@ -15,6 +15,8 @@ export interface AppConfig {
   readonly telemetry: TelemetryConfig;
   readonly workspace: WorkspaceConfig;
   readonly plugins: PluginConfig;
+  readonly databaseUrl?: string;
+  readonly chromaUrl?: string;
 }
 
 export interface LlmConfig {
@@ -23,12 +25,14 @@ export interface LlmConfig {
   apiKey: string;
   temperature: number;
   maxTokens: number;
+  embeddingModel?: string;
 }
 
 export interface TelemetryConfig {
   enabled: boolean;
   sentryDsn?: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+  logDir?: string;
 }
 
 export interface WorkspaceConfig {
@@ -52,3 +56,8 @@ export type ConfigOverride = Partial<AppConfig> & {
   workspace?: Partial<WorkspaceConfig>;
   plugins?: Partial<PluginConfig>;
 };
+
+// Export implementations
+export { DefaultConfigLoader } from './loader';
+export { EnvConfigSource, JsonConfigSource, mergeConfigs } from './sources';
+export { ConfigValidator } from './schema';

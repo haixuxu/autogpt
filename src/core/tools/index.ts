@@ -35,3 +35,6 @@ export interface ToolAdapter {
   readonly registerBuiltinTools: (registry: ToolRegistry) => Promise<void> | void;
   readonly registerPluginTools: (registry: ToolRegistry) => Promise<void> | void;
 }
+
+export { DefaultToolRegistry } from './registry';
+export * from './builtin/index';

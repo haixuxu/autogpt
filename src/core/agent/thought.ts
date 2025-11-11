@@ -42,3 +42,5 @@ export interface ThoughtResponsePayload {
   readonly raw: string;
   readonly parsed?: unknown;
 }
+
+export { DefaultThoughtProcess } from './thought-process';
