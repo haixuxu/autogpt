@@ -6,3 +6,11 @@ dist
 .env.test.local
 .env.production.local
 .DS_Store
+.idea
+.vscode
+.next
+.nextjs
+.nextjs-cache
+.nextjs-cache-manifest
+temp
+*.db

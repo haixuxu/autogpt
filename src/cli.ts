@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import 'dotenv/config';
 import { DefaultConfigLoader, EnvConfigSource, JsonConfigSource } from './core/config/index';
 import { WinstonLogger } from './core/telemetry/index';
 import { AutoGPTCli } from './core/cli/index';
