@@ -4,6 +4,7 @@ import type { Logger } from '../telemetry/index';
 import { runCommand } from './commands/run';
 import { listCommand } from './commands/list';
 import { showCommand } from './commands/show';
+import { toolsCommand } from './commands/tools';
 
 export interface CliBootstrapOptions {
   readonly configLoader: ConfigLoader;
@@ -79,6 +80,19 @@ export class AutoGPTCli {
           await showCommand(agentId, { logger: this.logger });
         } catch (error) {
           this.logger.error('Failed to execute show command', { error });
+          process.exit(1);
+        }
+      });
+
+    // Tools command
+    this.program
+      .command('tools')
+      .description('List all available tools')
+      .action(async () => {
+        try {
+          await toolsCommand({ logger: this.logger });
+        } catch (error) {
+          this.logger.error('Failed to execute tools command', { error });
           process.exit(1);
         }
       });

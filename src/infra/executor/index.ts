@@ -40,5 +40,6 @@ export interface ExecutorFactory {
 }
 
 export { LocalSandboxExecutor } from './local-executor';
+export { DockerExecutor } from './docker-executor';
 export { DefaultExecutorFactory, DEFAULT_SANDBOX_POLICY } from './factory';
 export * from './sandbox-utils';

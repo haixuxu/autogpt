@@ -23,9 +23,11 @@ export interface LlmConfig {
   provider: string;
   model: string;
   apiKey: string;
+  baseURL?: string;
   temperature: number;
   maxTokens: number;
   embeddingModel?: string;
+  embeddingProvider?: string;
 }
 
 export interface TelemetryConfig {

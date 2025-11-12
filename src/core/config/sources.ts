@@ -17,20 +17,73 @@ export class EnvConfigSource implements ConfigSource {
       loadEnv(); // Load from default .env location
     }
 
+    // Determine provider (defaults to openai)
+    const provider = (process.env.LLM_PROVIDER || process.env.OPENAI_PROVIDER || 'openai').toLowerCase();
+    
+    // Load config based on provider
+    const llmConfig: Record<string, unknown> = { provider };
+    
+    switch (provider) {
+      case 'anthropic':
+      case 'claude':
+        llmConfig.model = process.env.ANTHROPIC_MODEL || 'claude-3-sonnet-20240229';
+        llmConfig.apiKey = process.env.ANTHROPIC_API_KEY || '';
+        llmConfig.baseURL = process.env.ANTHROPIC_BASE_URL;
+        llmConfig.temperature = process.env.ANTHROPIC_TEMPERATURE
+          ? parseFloat(process.env.ANTHROPIC_TEMPERATURE)
+          : undefined;
+        llmConfig.maxTokens = process.env.ANTHROPIC_MAX_TOKENS
+          ? parseInt(process.env.ANTHROPIC_MAX_TOKENS, 10)
+          : undefined;
+        llmConfig.embeddingModel = process.env.ANTHROPIC_EMBEDDING_MODEL;
+        break;
+      
+      case 'ollama':
+      case 'local':
+        llmConfig.model = process.env.OLLAMA_MODEL || 'llama2';
+        llmConfig.apiKey = process.env.OLLAMA_API_KEY || '';  // Optional for Ollama
+        llmConfig.baseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+        llmConfig.temperature = process.env.OLLAMA_TEMPERATURE
+          ? parseFloat(process.env.OLLAMA_TEMPERATURE)
+          : undefined;
+        llmConfig.maxTokens = process.env.OLLAMA_MAX_TOKENS
+          ? parseInt(process.env.OLLAMA_MAX_TOKENS, 10)
+          : undefined;
+        llmConfig.embeddingModel = process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text';
+        break;
+      
+      case 'azure':
+      case 'azure-openai':
+        llmConfig.model = process.env.AZURE_OPENAI_MODEL || 'gpt-4';
+        llmConfig.apiKey = process.env.AZURE_OPENAI_API_KEY || '';
+        llmConfig.baseURL = process.env.AZURE_OPENAI_BASE_URL;
+        llmConfig.temperature = process.env.AZURE_OPENAI_TEMPERATURE
+          ? parseFloat(process.env.AZURE_OPENAI_TEMPERATURE)
+          : undefined;
+        llmConfig.maxTokens = process.env.AZURE_OPENAI_MAX_TOKENS
+          ? parseInt(process.env.AZURE_OPENAI_MAX_TOKENS, 10)
+          : undefined;
+        llmConfig.embeddingModel = process.env.AZURE_OPENAI_EMBEDDING_MODEL;
+        break;
+      
+      case 'openai':
+      default:
+        llmConfig.model = process.env.OPENAI_MODEL || 'gpt-4';
+        llmConfig.apiKey = process.env.OPENAI_API_KEY || '';
+        llmConfig.baseURL = process.env.OPENAI_BASE_URL;
+        llmConfig.temperature = process.env.OPENAI_TEMPERATURE
+          ? parseFloat(process.env.OPENAI_TEMPERATURE)
+          : undefined;
+        llmConfig.maxTokens = process.env.OPENAI_MAX_TOKENS
+          ? parseInt(process.env.OPENAI_MAX_TOKENS, 10)
+          : undefined;
+        llmConfig.embeddingModel = process.env.OPENAI_EMBEDDING_MODEL;
+        break;
+    }
+
     // Map environment variables to config structure
     const config: Record<string, unknown> = {
-      llm: {
-        provider: process.env.OPENAI_PROVIDER || 'openai',
-        model: process.env.OPENAI_MODEL,
-        apiKey: process.env.OPENAI_API_KEY,
-        temperature: process.env.OPENAI_TEMPERATURE
-          ? parseFloat(process.env.OPENAI_TEMPERATURE)
-          : undefined,
-        maxTokens: process.env.OPENAI_MAX_TOKENS
-          ? parseInt(process.env.OPENAI_MAX_TOKENS, 10)
-          : undefined,
-        embeddingModel: process.env.OPENAI_EMBEDDING_MODEL,
-      },
+      llm: llmConfig,
       telemetry: {
         enabled: process.env.TELEMETRY_ENABLED !== 'false',
         sentryDsn: process.env.SENTRY_DSN,

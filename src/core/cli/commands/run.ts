@@ -11,7 +11,7 @@ import {
   DefaultToolRegistry,
   registerBuiltinTools,
 } from '../../tools/index';
-import { OpenAIProvider } from '../../../infra/llm/index';
+import { LlmProviderFactory } from '../../../infra/llm/index';
 
 export interface RunCommandOptions {
   workspace?: string;
@@ -42,13 +42,13 @@ export async function runCommand(
     const toolRegistry = new DefaultToolRegistry();
     registerBuiltinTools(toolRegistry);
 
-    if (!config.llm.apiKey) {
+    if (!config.llm.apiKey && config.llm.provider !== 'ollama') {
       throw new Error(
-        'Missing OpenAI API key. Please set OPENAI_API_KEY in your environment or configuration.'
+        `Missing API key for ${config.llm.provider}. Please set the appropriate API key in your environment or configuration.`
       );
     }
 
-    const provider = new OpenAIProvider(config.llm);
+    const provider = LlmProviderFactory.create(config.llm);
     const memory = new StubMemoryManager();
     const thoughtProcess = new DefaultThoughtProcess(
       provider,

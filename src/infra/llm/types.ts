@@ -58,3 +58,12 @@ export interface EmbeddingResponse {
   };
 }
 
+export interface LlmProvider {
+  chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResponse>;
+  chatStream(
+    messages: ChatMessage[],
+    options?: ChatOptions
+  ): AsyncIterable<ChatStreamChunk>;
+  embed(texts: string[]): Promise<number[][]>;
+}
+

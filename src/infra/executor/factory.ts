@@ -1,5 +1,6 @@
 import type { ExecutorFactory, CodeExecutor, SandboxPolicy } from './index';
 import { LocalSandboxExecutor } from './local-executor';
+import { DockerExecutor } from './docker-executor';
 
 export class DefaultExecutorFactory implements ExecutorFactory {
   async createLocalSandbox(policy: SandboxPolicy): Promise<CodeExecutor> {
@@ -7,7 +8,13 @@ export class DefaultExecutorFactory implements ExecutorFactory {
   }
 
   async createDockerExecutor(policy: SandboxPolicy): Promise<CodeExecutor> {
-    throw new Error('Docker executor not yet implemented - use local sandbox');
+    try {
+      return new DockerExecutor(policy);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to create Docker executor: ${message}`);
+    }
   }
 }
 

@@ -5,9 +5,11 @@ export const LlmConfigSchema = z.object({
   provider: z.string().default('openai'),
   model: z.string().default('gpt-4'),
   apiKey: z.string().min(1, 'API key is required'),
+  baseURL: z.string().optional(),
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().positive().default(2000),
   embeddingModel: z.string().optional().default('text-embedding-3-small'),
+  embeddingProvider: z.string().optional(),
 });
 
 export const TelemetryConfigSchema = z.object({

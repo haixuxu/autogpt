@@ -2,6 +2,9 @@ import type { ToolRegistry } from '../index';
 import {
   ReadFileTool,
   WriteFileTool,
+  AppendToFileTool,
+  DeleteFileTool,
+  DownloadFileTool,
   ListDirectoryTool,
 } from './filesystem';
 import { WebSearchTool, WebScrapeTool } from './web-search';
@@ -15,6 +18,9 @@ export function registerBuiltinTools(registry: ToolRegistry): void {
   // Filesystem tools
   registry.register(new ReadFileTool());
   registry.register(new WriteFileTool());
+  registry.register(new AppendToFileTool());
+  registry.register(new DeleteFileTool());
+  registry.register(new DownloadFileTool());
   registry.register(new ListDirectoryTool());
 
   // Web tools

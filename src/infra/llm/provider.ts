@@ -1,21 +1,14 @@
 import OpenAI from 'openai';
 import type { LlmConfig } from '../../core/config/index';
+
 import type {
   ChatMessage,
   ChatOptions,
   ChatResponse,
   ChatStreamChunk,
   EmbeddingResponse,
+  LlmProvider,
 } from './types';
-
-export interface LlmProvider {
-  chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResponse>;
-  chatStream(
-    messages: ChatMessage[],
-    options?: ChatOptions
-  ): AsyncIterator<ChatStreamChunk>;
-  embed(texts: string[]): Promise<number[][]>;
-}
 
 export class OpenAIProvider implements LlmProvider {
   private client: OpenAI;
@@ -47,7 +40,7 @@ export class OpenAIProvider implements LlmProvider {
           return message;
         }),
         temperature: options?.temperature ?? this.config.temperature,
-        max_tokens: options?.maxTokens ?? this.config.maxTokens,
+        max_completion_tokens: options?.maxTokens ?? this.config.maxTokens,
         functions: options?.functions,
         function_call: options?.functionCall,
       },
@@ -80,7 +73,7 @@ export class OpenAIProvider implements LlmProvider {
   async *chatStream(
     messages: ChatMessage[],
     options?: ChatOptions
-  ): AsyncIterator<ChatStreamChunk> {
+  ): AsyncIterable<ChatStreamChunk> {
     const stream = await this.client.chat.completions.create(
       {
         model: this.config.model,
