@@ -3,26 +3,86 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export const taskRoutes: FastifyPluginAsync = async (fastify) => {
-  // Get all tasks (agents)
-  fastify.get('/', async (request, reply) => {
-    try {
-      const tasks = await prisma.agent.findMany({
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          task: true,
-          createdAt: true,
-          updatedAt: true,
-          _count: {
-            select: { cycles: true },
-          },
-        },
-      });
+interface TaskQuerystring {
+  page?: string;
+  pageSize?: string;
+}
 
-      return { tasks };
+// Transform Agent to Agent Protocol Task format
+function transformToTaskFormat(agent: any) {
+  return {
+    task_id: agent.id,
+    input: agent.task,
+    status: mapAgentStatusToTaskStatus(agent.status),
+    created_at: agent.createdAt.toISOString(),
+    modified_at: agent.updatedAt.toISOString(),
+    artifacts: agent.steps?.flatMap((step: any) =>
+      (step.artifacts || []).map((artifact: any) => ({
+        artifact_id: artifact.id,
+        file_name: artifact.fileName,
+        relative_path: artifact.relativePath,
+      }))
+    ) || [],
+  };
+}
+
+// Map internal agent status to Agent Protocol task status
+function mapAgentStatusToTaskStatus(agentStatus: string): string {
+  switch (agentStatus.toUpperCase()) {
+    case 'ACTIVE':
+    case 'RUNNING':
+      return 'running';
+    case 'COMPLETED':
+    case 'SUCCESS':
+      return 'completed';
+    case 'FAILED':
+    case 'ERROR':
+      return 'failed';
+    case 'PAUSED':
+      return 'paused';
+    case 'CANCELLED':
+      return 'cancelled';
+    default:
+      return 'created';
+  }
+}
+
+export const taskRoutes: FastifyPluginAsync = async (fastify) => {
+  // Get all tasks (agents) with pagination
+  fastify.get<{
+    Querystring: TaskQuerystring;
+  }>('/', async (request, reply) => {
+    const page = parseInt(request.query.page || '1', 10);
+    const pageSize = parseInt(request.query.pageSize || '20', 10);
+
+    try {
+      const [tasks, total] = await Promise.all([
+        prisma.agent.findMany({
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          include: {
+            steps: {
+              include: {
+                artifacts: true,
+              },
+            },
+          },
+        }),
+        prisma.agent.count(),
+      ]);
+
+      const totalPages = Math.ceil(total / pageSize);
+
+      return {
+        tasks: tasks.map(transformToTaskFormat),
+        pagination: {
+          total,
+          page,
+          pageSize,
+          totalPages,
+        },
+      };
     } catch (error) {
       reply.code(500);
       return { error: 'Failed to fetch tasks' };
@@ -233,6 +293,149 @@ export const taskRoutes: FastifyPluginAsync = async (fastify) => {
       fastify.log.error('Failed to delete task:', error);
       reply.code(500);
       return { error: 'Failed to delete task', details: error.message };
+    }
+  });
+
+  // Cancel task
+  fastify.post('/:id/cancel', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const agent = await prisma.agent.findUnique({
+        where: { id },
+      });
+
+      if (!agent) {
+        reply.code(404);
+        return { error: 'Task not found' };
+      }
+
+      // Update status to CANCELLED
+      const updatedAgent = await prisma.agent.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+      });
+
+      // Mark all running steps as failed
+      await prisma.step.updateMany({
+        where: {
+          agentId: id,
+          status: 'running',
+        },
+        data: {
+          status: 'failed',
+          completedAt: new Date(),
+          output: JSON.stringify({ error: 'Task was cancelled' }),
+        },
+      });
+
+      // Emit WebSocket event
+      const wsHub = (fastify as any).wsHub;
+      if (wsHub) {
+        wsHub.broadcast({
+          type: 'task.cancelled',
+          task_id: id,
+          data: { status: 'cancelled' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      fastify.log.info(`Task cancelled: ${id}`);
+      return { task_id: id, status: 'cancelled' };
+    } catch (error: any) {
+      fastify.log.error('Failed to cancel task:', error);
+      reply.code(500);
+      return { error: 'Failed to cancel task', details: error.message };
+    }
+  });
+
+  // Pause task
+  fastify.post('/:id/pause', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const agent = await prisma.agent.findUnique({
+        where: { id },
+      });
+
+      if (!agent) {
+        reply.code(404);
+        return { error: 'Task not found' };
+      }
+
+      if (agent.status !== 'ACTIVE' && agent.status !== 'RUNNING') {
+        reply.code(400);
+        return { error: 'Task is not running and cannot be paused' };
+      }
+
+      // Update status to PAUSED
+      await prisma.agent.update({
+        where: { id },
+        data: { status: 'PAUSED' },
+      });
+
+      // Emit WebSocket event
+      const wsHub = (fastify as any).wsHub;
+      if (wsHub) {
+        wsHub.broadcast({
+          type: 'task.paused',
+          task_id: id,
+          data: { status: 'paused' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      fastify.log.info(`Task paused: ${id}`);
+      return { task_id: id, status: 'paused' };
+    } catch (error: any) {
+      fastify.log.error('Failed to pause task:', error);
+      reply.code(500);
+      return { error: 'Failed to pause task', details: error.message };
+    }
+  });
+
+  // Resume task
+  fastify.post('/:id/resume', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const agent = await prisma.agent.findUnique({
+        where: { id },
+      });
+
+      if (!agent) {
+        reply.code(404);
+        return { error: 'Task not found' };
+      }
+
+      if (agent.status !== 'PAUSED') {
+        reply.code(400);
+        return { error: 'Task is not paused and cannot be resumed' };
+      }
+
+      // Update status to ACTIVE
+      await prisma.agent.update({
+        where: { id },
+        data: { status: 'ACTIVE' },
+      });
+
+      // Emit WebSocket event
+      const wsHub = (fastify as any).wsHub;
+      if (wsHub) {
+        wsHub.broadcast({
+          type: 'task.resumed',
+          task_id: id,
+          data: { status: 'running' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      fastify.log.info(`Task resumed: ${id}`);
+      return { task_id: id, status: 'running' };
+    } catch (error: any) {
+      fastify.log.error('Failed to resume task:', error);
+      reply.code(500);
+      return { error: 'Failed to resume task', details: error.message };
     }
   });
 };

@@ -2,16 +2,22 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
+import multipart from '@fastify/multipart';
 import type WebSocket from 'ws';
 import { agentRoutes } from './routes/agents.js';
 import { taskRoutes } from './routes/tasks.js';
 import { agentMessageRoutes } from './routes/agent-messages.js';
 import { agentRunRoutes } from './routes/agent-run.js';
-import { subscribeAgent, unsubscribeSocket } from './services/ws-hub.js';
+import stepsRoutes from './routes/steps.js';
+import artifactsRoutes from './routes/artifacts.js';
+import { subscribeAgent, unsubscribeSocket, wsHub } from './services/ws-hub.js';
 
 const fastify = Fastify({
   logger: true,
 });
+
+// Attach wsHub to fastify instance for access in routes
+(fastify as any).wsHub = wsHub;
 
 // CORS
 await fastify.register(cors, {
@@ -21,6 +27,13 @@ await fastify.register(cors, {
 
 // WebSocket
 await fastify.register(websocket);
+
+// Multipart for file uploads
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max file size
+  },
+});
 
 // Health check
 fastify.get('/health', async () => {
@@ -32,6 +45,8 @@ fastify.register(agentRoutes, { prefix: '/api/agents' });
 fastify.register(agentMessageRoutes, { prefix: '/api/agents' });
 fastify.register(agentRunRoutes, { prefix: '/api/agents' });
 fastify.register(taskRoutes, { prefix: '/api/tasks' });
+fastify.register(stepsRoutes, { prefix: '/api/tasks' });
+fastify.register(artifactsRoutes, { prefix: '/api/tasks' });
 
 // WebSocket endpoint
 fastify.register(async (instance) => {

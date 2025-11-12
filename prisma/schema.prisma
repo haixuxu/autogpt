@@ -21,6 +21,7 @@ model Agent {
   cycles       AgentCycle[]
   memories     MemoryRecord[]
   messages     AgentMessage[]
+  steps        Step[]
 }
 
 model Workspace {
@@ -109,4 +110,39 @@ model AgentMessage {
 
   @@index([agentId, createdAt])
   @@index([agentId, handled, createdAt])
+}
+
+model Step {
+  id              String      @id @default(cuid())
+  agent           Agent       @relation(fields: [agentId], references: [id])
+  agentId         String
+  stepIndex       Int
+  name            String
+  input           String      // JSON string
+  output          String?     // JSON string
+  status          String      @default("created") // created, running, completed, failed
+  isLast          Boolean     @default(false)
+  additionalInput String?     // JSON string
+  additionalOutput String?    // JSON string
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  artifacts       Artifact[]
+
+  @@unique([agentId, stepIndex])
+  @@index([agentId, status])
+}
+
+model Artifact {
+  id          String   @id @default(cuid())
+  step        Step     @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  stepId      String
+  fileName    String
+  relativePath String?
+  uri         String
+  mimeType    String?
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  @@index([stepId])
 }
